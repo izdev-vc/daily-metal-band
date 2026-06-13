@@ -1,4 +1,4 @@
-name: Generate Android Keystore
+name: Android Production Build
 on:
   push:
     branches:
@@ -6,23 +6,41 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
 jobs:
-  generate-key:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: ⚙️ Konfiguracja Java
+      - name: 🏗 Pobranie kodu z repozytorium
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Konfiguracja środowiska Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: ⚙️ Konfiguracja Java (wymagana dla Androida)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🔑 Wygenerowanie klucza Keystore przez GitHub
-        run: |
-          keytool -genkey -v -keystore my-upload-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass "jkis66,?!#jakostakTobyl" -keypass "jkis66,?!#jakostakTobyl" -dname "CN=MyName, OU=MyOrg, O=MyCompany, L=MyCity, S=MyState, C=PL"
+      - name: 🏗 Konfiguracja Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: 💾 Udostępnienie pliku do pobrania
+      - name: 📦 Instalacja bibliotek (dependencies)
+        run: npm install
+
+      - name: 🚀 Budowanie aplikacji Android (Plik produkcyjny AAB)
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      - name: 💾 Zapisanie gotowego pliku aplikacji
         uses: actions/upload-artifact@v4
         with:
-          name: generated-keystore
-          path: my-upload-key.keystore
+          name: app-release
+          path: android/app/build/outputs/bundle/release/app-release.aab
