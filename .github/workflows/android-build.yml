@@ -44,6 +44,7 @@ jobs:
           MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew bundleRelease
 
       - name: 💾 Zapisanie gotowego pliku aplikacji
