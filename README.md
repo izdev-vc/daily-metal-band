@@ -1,8 +1,8 @@
 # 🤘 Daily Metal Band
 
-> One powerful metal lyric. Every day. Forever.
+> One metal band. Every day. Forever.
 
-A mobile app for Android (iOS coming soon) that delivers one handpicked quote from metal song lyrics every single day.
+A mobile app for Android that delivers one handpicked metal band every single day — with genre, essential album, fun fact and a Wikipedia link.
 
 ---
 
@@ -14,11 +14,13 @@ A mobile app for Android (iOS coming soon) that delivers one handpicked quote fr
 
 ## ✨ Features
 
-- 🎸 One new quote every day
-- 🏷️ Band, album, song and year information  
-- 📤 Share your daily quote with friends
+- 🎸 One new metal band every day
+- 🏷️ Genre, country, founding year and active status
+- 💿 Essential album recommendation
+- 🤘 Fun fact about the band
+- 📤 Share today's band with friends
 - 🌑 Pure dark UI built for metal fans
-- ☁️ Quotes fetched from the cloud — always fresh
+- ☁️ Data fetched from the cloud — always fresh
 
 ---
 
@@ -26,17 +28,18 @@ A mobile app for Android (iOS coming soon) that delivers one handpicked quote fr
 
 | Technology | Purpose |
 |---|---|
-| React Native + Expo | Mobile app (Android & iOS) |
+| React Native + Expo | Mobile app (Android) |
 | TypeScript | Type-safe code |
 | Supabase | Cloud database & API |
 | EAS Build | Cloud building & deployment |
-| GitHub | Version control & portfolio |
+| GitHub Actions | Automated Android builds |
 
 ---
+
 ## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 24+
 - Expo Go app on your phone
 
 ### Installation
@@ -64,18 +67,20 @@ Scan the QR code with Expo Go on your phone.
 
 ## 🗄️ Database Schema
 
-    CREATE TABLE quotes (
+    CREATE TABLE bands (
       id bigint PRIMARY KEY,
-      quote text NOT NULL,
-      band varchar NOT NULL,
-      album varchar NOT NULL,
-      song varchar NOT NULL,
-      year int4,
+      name varchar NOT NULL,
+      country varchar NOT NULL,
+      year_founded int4,
+      is_active bool,
+      genre varchar NOT NULL,
+      essential_album_title varchar,
+      essential_album_year int4,
+      fun_fact text,
+      wikipedia_url varchar,
       active_date date UNIQUE,
       created_at timestamptz DEFAULT now()
     );
-
----
 
 ---
 
@@ -95,14 +100,14 @@ Scan the QR code with Expo Go on your phone.
 
 ## 🎯 What I Learned
 
-This is my first mobile app, built while learning vibe coding from scratch. Key learnings:
+My first mobile app, built while learning to code from scratch. Key learnings:
 
 - Building a React Native app with Expo from zero
 - Connecting a mobile app to a cloud database (Supabase)
 - Row Level Security for API protection
-- Publishing to Google Play Store
-- Using EAS Build for cloud compilation
+- EAS Build for cloud compilation
 - Git & GitHub for version control
+- GitHub Actions for automated Android builds
 
 ---
 
