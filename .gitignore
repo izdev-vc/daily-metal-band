@@ -42,3 +42,8 @@ app-example
 # generated native folders
 .idea/
 TempAssets/
+.aider*
+
+# local notes (never commit)
+Local_*.md
+.obsidian/
