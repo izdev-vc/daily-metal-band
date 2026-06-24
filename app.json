@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Daily Metal Band",
-    "slug": "DailyMetalBand",
+    "slug": "MetalDailyQuote",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -54,6 +54,7 @@
       "eas": {
         "projectId": "f11760ea-e798-4ba4-84de-a72add650ac0"
       }
-    }
+    },
+    "owner": "izdev-vc"
   }
 }
