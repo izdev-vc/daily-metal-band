@@ -89,7 +89,8 @@ android {
 
     namespace 'com.izdevvc.dailymetalband'
     defaultConfig {
-        applicationId 'com.izdevvc.dailymetalband'
+        // Play Store package name is immutable — app was registered as metaldailyquote
+        applicationId 'com.izdevvc.metaldailyquote'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

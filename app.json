@@ -13,7 +13,7 @@
       "bundleIdentifier": "com.izdevvc.dailymetalband"
     },
     "android": {
-      "package": "com.izdevvc.dailymetalband",
+      "package": "com.izdevvc.metaldailyquote",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0d0d0d",
