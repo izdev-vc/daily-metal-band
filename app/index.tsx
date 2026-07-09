@@ -10,6 +10,7 @@ import {
   IBMPlexSans_500Medium,
 } from '@expo-google-fonts/ibm-plex-sans';
 import { useFonts } from 'expo-font';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import {
   Linking,
@@ -286,13 +287,19 @@ export default function HomeScreen() {
         </View>
 
         {/* 6. ESSENTIAL ALBUM */}
-        <View style={[styles.block, styles.albumBlock]}>
+        <LinearGradient
+          colors={['rgba(217,164,65,0.14)', 'rgba(217,164,65,0.03)', 'rgba(217,164,65,0)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 0 }}
+          style={styles.block}
+        >
           <SectionLabel text="ESSENTIAL ALBUM" accent />
           <Text style={styles.albumTitle}>
             {band.essential_album_title.toUpperCase()}
           </Text>
           <Text style={styles.albumYear}>RELEASED {band.essential_album_year}</Text>
-        </View>
+        </LinearGradient>
 
         {/* 7. DID YOU KNOW */}
         <View style={styles.block}>
@@ -336,14 +343,14 @@ export default function HomeScreen() {
             onGoToday={goTodayTab}
           />
         )}
+        {toast && (
+          <UndoToast
+            bandName={toast.favorite.name}
+            animKey={toast.key}
+            onUndo={undoRemove}
+          />
+        )}
       </View>
-      {toast && (
-        <UndoToast
-          bandName={toast.favorite.name}
-          animKey={toast.key}
-          onUndo={undoRemove}
-        />
-      )}
       <BottomTabBar
         tab={tab}
         favoritesCount={favorites.length}
@@ -537,9 +544,6 @@ const styles = StyleSheet.create({
   },
 
   // ALBUM
-  albumBlock: {
-    backgroundColor: COLORS.amberGlow,
-  },
   albumTitle: {
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 32,
