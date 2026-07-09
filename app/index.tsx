@@ -21,10 +21,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BandSkeleton from '../components/BandSkeleton';
+import BottomTabBar, { TabKey } from '../components/BottomTabBar';
 import DayStrip from '../components/DayStrip';
+import FavoriteButton from '../components/FavoriteButton';
+import FavoritesList from '../components/FavoritesList';
 import ShareCard from '../components/ShareCard';
+import UndoToast from '../components/UndoToast';
 import { COLORS } from '../constants/colors';
+import { useFavorites } from '../hooks/useFavorites';
 import { supabase } from '../services/supabase';
+import {
+  formatDateString,
+  getLocalDateString,
+  shiftDateString,
+} from '../utils/date';
 
 // Dziś + 7 dni wstecz — starsze wpisy celowo niedostępne
 const DAY_STRIP_LENGTH = 8;
@@ -43,24 +53,6 @@ type Band = {
   wikipedia_url: string;
   active_date: string;
 };
-
-// ─── Helpers ──────────────────────────────────────────────────
-function getLocalDateString(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function formatDateString(s: string) {
-  const [yyyy, mm, dd] = s.split('-');
-  return `${dd}.${mm}.${yyyy}`;
-}
-
-function shiftDateString(s: string, days: number) {
-  const [y, m, d] = s.split('-').map(Number);
-  return getLocalDateString(new Date(y, m - 1, d + days));
-}
 
 function SectionLabel({ text, accent }: { text: string; accent?: boolean }) {
   return (
@@ -89,6 +81,9 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState(() =>
     getLocalDateString(new Date())
   );
+  const [tab, setTab] = useState<TabKey>('today');
+  const { favorites, isFavorite, toggleFavorite, removeFavorite, undoRemove, toast } =
+    useFavorites();
   const [band, setBand] = useState<Band | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,17 +157,21 @@ export default function HomeScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <BandSkeleton />
-      </SafeAreaView>
-    );
-  }
+  const openFavorite = (date: string) => {
+    setSelectedDate(date);
+    setTab('today');
+  };
 
-  if (!band) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+  const goTodayTab = () => {
+    setSelectedDate(today);
+    setTab('today');
+  };
+
+  const renderToday = () => {
+    if (loading) return <BandSkeleton />;
+
+    if (!band) {
+      return (
         <View style={styles.errorScreen}>
           <View style={styles.errorBadge}>
             <Text style={styles.errorBang}>!</Text>
@@ -195,12 +194,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </SafeAreaView>
-    );
-  }
+      );
+    }
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    return (
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.screenContent}
@@ -229,6 +226,18 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.heroRule} />
           <Text style={styles.heroDate}>{formatDateString(selectedDate)}</Text>
+          <FavoriteButton
+            isFavorite={isFavorite(band.active_date)}
+            onToggle={() =>
+              toggleFavorite({
+                activeDate: band.active_date,
+                name: band.name,
+                genre: band.genre,
+                country: band.country,
+                yearFounded: band.year_founded,
+              })
+            }
+          />
           {!isToday && (
             <TouchableOpacity
               style={styles.todayPill}
@@ -311,6 +320,35 @@ export default function HomeScreen() {
         {/* 9. FOOTER */}
         <Text style={styles.footnote}>— DAILY METAL BAND —</Text>
       </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <View style={styles.content}>
+        {tab === 'today' ? (
+          renderToday()
+        ) : (
+          <FavoritesList
+            favorites={favorites}
+            onOpen={openFavorite}
+            onRemove={removeFavorite}
+            onGoToday={goTodayTab}
+          />
+        )}
+      </View>
+      {toast && (
+        <UndoToast
+          bandName={toast.favorite.name}
+          animKey={toast.key}
+          onUndo={undoRemove}
+        />
+      )}
+      <BottomTabBar
+        tab={tab}
+        favoritesCount={favorites.length}
+        onChange={setTab}
+      />
     </SafeAreaView>
   );
 }
@@ -320,6 +358,9 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  content: {
+    flex: 1,
   },
   screen: {
     flex: 1,
