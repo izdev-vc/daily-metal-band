@@ -20,9 +20,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BandSkeleton from '../components/BandSkeleton';
+import DayStrip from '../components/DayStrip';
 import ShareCard from '../components/ShareCard';
 import { COLORS } from '../constants/colors';
 import { supabase } from '../services/supabase';
+
+// Dziś + 7 dni wstecz — starsze wpisy celowo niedostępne
+const DAY_STRIP_LENGTH = 8;
 
 // ─── Typ rekordu z bazy ───────────────────────────────────────
 type Band = {
@@ -40,13 +45,6 @@ type Band = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
-function formatDate(d: Date) {
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}.${mm}.${yyyy}`;
-}
-
 function getLocalDateString(d: Date) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -54,11 +52,23 @@ function getLocalDateString(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function SectionLabel({ text }: { text: string }) {
+function formatDateString(s: string) {
+  const [yyyy, mm, dd] = s.split('-');
+  return `${dd}.${mm}.${yyyy}`;
+}
+
+function shiftDateString(s: string, days: number) {
+  const [y, m, d] = s.split('-').map(Number);
+  return getLocalDateString(new Date(y, m - 1, d + days));
+}
+
+function SectionLabel({ text, accent }: { text: string; accent?: boolean }) {
   return (
     <View style={styles.seclabel}>
       <View style={styles.seclabelDot} />
-      <Text style={styles.seclabelText}>{text}</Text>
+      <Text style={[styles.seclabelText, accent && styles.seclabelTextAccent]}>
+        {text}
+      </Text>
       <View style={styles.seclabelLine} />
     </View>
   );
@@ -76,42 +86,72 @@ export default function HomeScreen() {
     IBMPlexMono_500Medium,
   });
 
+  const [selectedDate, setSelectedDate] = useState(() =>
+    getLocalDateString(new Date())
+  );
   const [band, setBand] = useState<Band | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [earliestDate, setEarliestDate] = useState<string | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
 
   useEffect(() => {
-    const today = getLocalDateString(new Date());
+    supabase
+      .from('bands')
+      .select('active_date')
+      .order('active_date', { ascending: true })
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]) setEarliestDate(data[0].active_date);
+      });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
     supabase
       .from('bands')
       .select(
         'id, name, country, year_founded, is_active, genre, essential_album_title, essential_album_year, fun_fact, wikipedia_url, active_date'
       )
-      .eq('active_date', today)
-      .single()
+      .eq('active_date', selectedDate)
+      .maybeSingle()
       .then(({ data, error: fetchError }) => {
+        if (cancelled) return;
+        setLoading(false);
         if (fetchError) {
-          setError('Could not load today\'s band. Check your connection.');
+          setBand(null);
+          setError("No connection.\nCouldn't load\nthe band.");
         } else if (data) {
           setBand(data as Band);
         } else {
-          setError('No band scheduled for today.');
+          setBand(null);
+          setError('No band scheduled\nfor this date.');
         }
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, fetchKey]);
 
   if (!fontsLoaded) return null;
 
-  if (error) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <Text style={styles.errorText}>{error}</Text>
-      </SafeAreaView>
-    );
+  const today = getLocalDateString(new Date());
+  const isToday = selectedDate === today;
+
+  const dayDates: string[] = [];
+  for (let i = DAY_STRIP_LENGTH - 1; i >= 0; i--) {
+    const d = shiftDateString(today, -i);
+    if (earliestDate && d < earliestDate) continue;
+    dayDates.push(d);
   }
 
-  if (!band) return null;
+  const retry = () => setFetchKey((k) => k + 1);
+  const goToday = () => setSelectedDate(today);
 
   const handleWikipedia = async () => {
+    if (!band) return;
     const url = band.wikipedia_url;
     if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
       try {
@@ -121,6 +161,43 @@ export default function HomeScreen() {
       }
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <BandSkeleton />
+      </SafeAreaView>
+    );
+  }
+
+  if (!band) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.errorScreen}>
+          <View style={styles.errorBadge}>
+            <Text style={styles.errorBang}>!</Text>
+          </View>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={retry}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryBtnText}>TRY AGAIN</Text>
+          </TouchableOpacity>
+          {!isToday && (
+            <TouchableOpacity
+              style={styles.todayPill}
+              onPress={goToday}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.todayPillText}>BACK TO TODAY</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -134,18 +211,36 @@ export default function HomeScreen() {
           <Text style={styles.brand}>DAILY METAL BAND</Text>
         </View>
 
-        {/* 2. HERO */}
+        {/* 2. DAY STRIP */}
+        <DayStrip
+          dates={dayDates}
+          selectedDate={selectedDate}
+          onSelect={setSelectedDate}
+        />
+
+        {/* 3. HERO */}
         <View style={styles.hero}>
-          <Text style={styles.heroCaption}>{"TODAY'S BAND"}</Text>
+          <Text style={styles.heroCaption}>
+            {isToday ? "TODAY'S BAND" : 'FROM THE ARCHIVE'}
+          </Text>
           <View style={styles.heroRule} />
           <Text style={styles.bandName} numberOfLines={2} adjustsFontSizeToFit>
             {band.name}
           </Text>
           <View style={styles.heroRule} />
-          <Text style={styles.heroDate}>{formatDate(new Date())}</Text>
+          <Text style={styles.heroDate}>{formatDateString(selectedDate)}</Text>
+          {!isToday && (
+            <TouchableOpacity
+              style={styles.todayPill}
+              onPress={goToday}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.todayPillText}>BACK TO TODAY</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* 3. SPECS GRID */}
+        {/* 4. SPECS GRID */}
         <View style={styles.specs}>
           <View style={styles.spec}>
             <Text style={styles.specLabel}>FROM</Text>
@@ -164,14 +259,16 @@ export default function HomeScreen() {
                   band.is_active ? styles.statusDotActive : styles.statusDotInactive,
                 ]}
               />
-              <Text style={styles.specValue}>
+              <Text
+                style={[styles.specValue, !band.is_active && styles.specValueDim]}
+              >
                 {band.is_active ? 'ACTIVE' : 'INACTIVE'}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* 4. GENRE */}
+        {/* 5. GENRE */}
         <View style={styles.block}>
           <SectionLabel text="GENRE" />
           <View style={styles.genreBox}>
@@ -179,22 +276,22 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 5. ESSENTIAL ALBUM */}
-        <View style={styles.block}>
-          <SectionLabel text="ESSENTIAL ALBUM" />
+        {/* 6. ESSENTIAL ALBUM */}
+        <View style={[styles.block, styles.albumBlock]}>
+          <SectionLabel text="ESSENTIAL ALBUM" accent />
           <Text style={styles.albumTitle}>
             {band.essential_album_title.toUpperCase()}
           </Text>
           <Text style={styles.albumYear}>RELEASED {band.essential_album_year}</Text>
         </View>
 
-        {/* 6. DID YOU KNOW */}
+        {/* 7. DID YOU KNOW */}
         <View style={styles.block}>
           <SectionLabel text="DID YOU KNOW" />
           <Text style={styles.pullquote}>{band.fun_fact}</Text>
         </View>
 
-        {/* 7. ACTIONS */}
+        {/* 8. ACTIONS */}
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.btn, styles.btnPrimary]}
@@ -211,7 +308,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* 8. FOOTER */}
+        {/* 9. FOOTER */}
         <Text style={styles.footnote}>— DAILY METAL BAND —</Text>
       </ScrollView>
     </SafeAreaView>
@@ -249,7 +346,7 @@ const styles = StyleSheet.create({
 
   // HERO
   hero: {
-    paddingVertical: 40,
+    paddingVertical: 36,
     paddingHorizontal: 24,
     alignItems: 'center',
     borderBottomWidth: 1,
@@ -260,13 +357,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 3,
     color: COLORS.dim,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   heroRule: {
     width: 60,
     height: 2,
     backgroundColor: COLORS.amber,
-    marginVertical: 18,
+    marginVertical: 16,
   },
   bandName: {
     fontFamily: 'BebasNeue_400Regular',
@@ -281,6 +378,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 3,
     color: COLORS.faint,
+  },
+  todayPill: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: COLORS.amber,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  todayPillText: {
+    fontFamily: 'IBMPlexMono_400Regular',
+    fontSize: 10,
+    letterSpacing: 2,
+    color: COLORS.amber,
   },
 
   // SPECS
@@ -313,10 +423,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: COLORS.bone,
   },
+  specValueDim: {
+    color: COLORS.dim,
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   statusDot: {
     width: 7,
@@ -327,7 +440,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.moss,
   },
   statusDotInactive: {
-    backgroundColor: COLORS.red,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: COLORS.dim,
   },
 
   // BLOCK
@@ -354,6 +469,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
     color: COLORS.dim,
   },
+  seclabelTextAccent: {
+    color: COLORS.amber,
+  },
   seclabelLine: {
     flex: 1,
     height: 1,
@@ -378,9 +496,12 @@ const styles = StyleSheet.create({
   },
 
   // ALBUM
+  albumBlock: {
+    backgroundColor: COLORS.amberGlow,
+  },
   albumTitle: {
     fontFamily: 'BebasNeue_400Regular',
-    fontSize: 26,
+    fontSize: 32,
     letterSpacing: 1.5,
     color: COLORS.bone,
   },
@@ -426,13 +547,47 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   // ERROR
+  errorScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 28,
+  },
+  errorBadge: {
+    width: 38,
+    height: 38,
+    borderWidth: 2,
+    borderColor: COLORS.bone,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  errorBang: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 20,
+    color: COLORS.bone,
+  },
   errorText: {
-    fontFamily: 'IBMPlexMono_400Regular',
-    fontSize: 13,
+    fontFamily: 'IBMPlexSans_300Light',
+    fontSize: 14.5,
+    lineHeight: 23,
     color: COLORS.dim,
     textAlign: 'center',
-    marginTop: 40,
-    paddingHorizontal: 24,
+    marginBottom: 26,
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderColor: COLORS.amber,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+  },
+  retryBtnText: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 14,
+    letterSpacing: 3,
+    color: COLORS.amber,
   },
 
   // FOOTER

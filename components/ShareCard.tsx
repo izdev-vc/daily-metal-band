@@ -1,5 +1,5 @@
 import * as Sharing from 'expo-sharing';
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     Alert,
     StyleSheet,
@@ -19,8 +19,11 @@ type Props = {
 
 export default function ShareCard({ bandName, genre, country, foundedYear }: Props) {
   const cardRef = useRef<ViewShot>(null);
+  const [sharing, setSharing] = useState(false);
 
   const handleShare = async () => {
+    if (sharing) return;
+    setSharing(true);
     try {
       const uri = await cardRef.current?.capture?.();
       if (!uri) return;
@@ -35,8 +38,10 @@ export default function ShareCard({ bandName, genre, country, foundedYear }: Pro
         mimeType: 'image/png',
         dialogTitle: 'Udostępnij zespół dnia',
       });
-    } catch (e) {
+    } catch {
       Alert.alert('Błąd', 'Nie udało się wygenerować karty.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -78,8 +83,15 @@ export default function ShareCard({ bandName, genre, country, foundedYear }: Pro
       </ViewShot>
 
       {/* Przycisk widoczny dla użytkownika */}
-      <TouchableOpacity style={styles.btn} onPress={handleShare}>
-        <Text style={styles.btnText}>↗ SHARE CARD</Text>
+      <TouchableOpacity
+        style={[styles.btn, sharing && styles.btnSharing]}
+        onPress={handleShare}
+        disabled={sharing}
+        activeOpacity={0.85}
+      >
+        <Text style={[styles.btnText, sharing && styles.btnTextSharing]}>
+          {sharing ? 'GENERATING...' : '↗  SHARE CARD'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -172,16 +184,24 @@ const styles = StyleSheet.create({
     color: COLORS.faint,
   },
   btn: {
-    backgroundColor: COLORS.red,
-    padding: 16,
+    borderWidth: 1.5,
+    borderColor: COLORS.bone,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+  },
+  btnSharing: {
+    borderColor: '#444',
+    opacity: 0.6,
   },
   btnText: {
-    color: '#fff',
+    fontFamily: 'BebasNeue_400Regular',
     fontSize: 16,
-    fontWeight: '700',
     letterSpacing: 3,
+    color: COLORS.bone,
+  },
+  btnTextSharing: {
+    color: '#666',
   },
 });
