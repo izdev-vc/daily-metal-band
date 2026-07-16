@@ -6,12 +6,6 @@ A mobile app for Android that delivers one handpicked metal band every single da
 
 ---
 
-## 📱 Download
-
-> Coming soon to Google Play Store
-
----
-
 ## ✨ Features
 
 - 🎸 One new metal band every day
