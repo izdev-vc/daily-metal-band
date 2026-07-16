@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import { COLORS } from '../constants/colors';
+import { track } from '../services/analytics';
 
 type Props = {
   bandName: string;
@@ -38,6 +39,7 @@ export default function ShareCard({ bandName, genre, country, foundedYear }: Pro
         mimeType: 'image/png',
         dialogTitle: 'Udostępnij zespół dnia',
       });
+      track('share_card_shared', { band_name: bandName });
     } catch {
       Alert.alert('Błąd', 'Nie udało się wygenerować karty.');
     } finally {

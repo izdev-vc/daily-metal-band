@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { track } from '../services/analytics';
 
 const STORAGE_KEY = 'favorites:v1';
 const TOAST_DURATION_MS = 5000;
@@ -52,19 +53,27 @@ export function useFavorites() {
     [favorites]
   );
 
-  const toggleFavorite = useCallback((band: Omit<FavoriteBand, 'savedAt'>) => {
-    setFavorites((prev) => {
-      const exists = prev.some((f) => f.activeDate === band.activeDate);
-      return exists
-        ? prev.filter((f) => f.activeDate !== band.activeDate)
-        : [...prev, { ...band, savedAt: new Date().toISOString() }];
-    });
-  }, []);
+  const toggleFavorite = useCallback(
+    (band: Omit<FavoriteBand, 'savedAt'>) => {
+      const exists = favorites.some((f) => f.activeDate === band.activeDate);
+      track(exists ? 'favorite_removed' : 'favorite_added', {
+        band_name: band.name,
+        source: 'toggle',
+      });
+      setFavorites((prev) =>
+        exists
+          ? prev.filter((f) => f.activeDate !== band.activeDate)
+          : [...prev, { ...band, savedAt: new Date().toISOString() }]
+      );
+    },
+    [favorites]
+  );
 
   const removeFavorite = useCallback(
     (activeDate: string) => {
       const removed = favorites.find((f) => f.activeDate === activeDate);
       if (!removed) return;
+      track('favorite_removed', { band_name: removed.name, source: 'list' });
       setFavorites((prev) => prev.filter((f) => f.activeDate !== activeDate));
       setToast((t) => ({ favorite: removed, key: (t?.key ?? 0) + 1 }));
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -76,6 +85,7 @@ export function useFavorites() {
   const undoRemove = useCallback(() => {
     if (!toast) return;
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    track('favorite_added', { band_name: toast.favorite.name, source: 'undo' });
     setFavorites((prev) =>
       prev.some((f) => f.activeDate === toast.favorite.activeDate)
         ? prev

@@ -30,6 +30,7 @@ import ShareCard from '../components/ShareCard';
 import UndoToast from '../components/UndoToast';
 import { COLORS } from '../constants/colors';
 import { useFavorites } from '../hooks/useFavorites';
+import { track } from '../services/analytics';
 import { supabase } from '../services/supabase';
 import {
   formatDateString,
@@ -119,11 +120,20 @@ export default function HomeScreen() {
         if (fetchError) {
           setBand(null);
           setError("No connection.\nCouldn't load\nthe band.");
+          track('band_load_failed', { date: selectedDate, reason: 'network' });
         } else if (data) {
-          setBand(data as Band);
+          const loadedBand = data as Band;
+          setBand(loadedBand);
+          track('band_viewed', {
+            band_id: loadedBand.id,
+            band_name: loadedBand.name,
+            band_date: loadedBand.active_date,
+            is_today: selectedDate === getLocalDateString(new Date()),
+          });
         } else {
           setBand(null);
           setError('No band scheduled\nfor this date.');
+          track('band_load_failed', { date: selectedDate, reason: 'not_scheduled' });
         }
       });
     return () => {
@@ -152,6 +162,7 @@ export default function HomeScreen() {
     if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
       try {
         await Linking.openURL(url);
+        track('wikipedia_opened', { band_name: band.name });
       } catch (e) {
         console.log('Cannot open URL:', e);
       }
@@ -161,6 +172,13 @@ export default function HomeScreen() {
   const openFavorite = (date: string) => {
     setSelectedDate(date);
     setTab('today');
+  };
+
+  const changeTab = (next: TabKey) => {
+    if (next === 'favorites' && tab !== 'favorites') {
+      track('favorites_tab_opened', { count: favorites.length });
+    }
+    setTab(next);
   };
 
   const goTodayTab = () => {
@@ -354,7 +372,7 @@ export default function HomeScreen() {
       <BottomTabBar
         tab={tab}
         favoritesCount={favorites.length}
-        onChange={setTab}
+        onChange={changeTab}
       />
     </SafeAreaView>
   );

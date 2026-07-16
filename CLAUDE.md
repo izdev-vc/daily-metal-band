@@ -8,6 +8,7 @@ Backend: Supabase (PostgreSQL). Build: EAS. Target: Google Play Store.
 - **Runtime**: React Native 0.81 / Expo ~54 / Expo Router ~6
 - **Language**: TypeScript ~5.9
 - **Backend**: Supabase JS v2 (anon key, RLS-protected)
+- **Analytics**: PostHog (EU cloud, `posthog-react-native`)
 - **Fonts**: Bebas Neue, IBM Plex Mono, IBM Plex Sans (via @expo-google-fonts)
 - **Build/Deploy**: EAS Build + EAS Submit
 
@@ -21,6 +22,7 @@ components/
   ui/                # Generic UI primitives
 services/
   supabase.ts        # Supabase client (single source of truth)
+  analytics.ts       # PostHog client + typed track() (single source of truth)
 assets/              # Images, fonts
 android/             # Android native project
 ```
@@ -55,13 +57,16 @@ Required in `.env` (never commit):
 ```
 EXPO_PUBLIC_SUPABASE_URL=...
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+EXPO_PUBLIC_POSTHOG_API_KEY=...   # phc_... project key; empty = analytics disabled (no-op)
 ```
 `EXPO_PUBLIC_` prefix = bundled into the app (visible to users). Anon key only — no service role key ever.
+Optional: `EXPO_PUBLIC_POSTHOG_HOST` (defaults to `https://eu.i.posthog.com`).
 
 ## Code style
 - TypeScript strict, no `any`
 - No default export from `services/supabase.ts` — use named export `supabase`
 - Do NOT create a second Supabase client in components/screens — import from `services/supabase.ts`
+- Analytics: always go through `track()` from `services/analytics.ts` — new event names must be added to the `AnalyticsEvent` union, snake_case
 - Styles: `StyleSheet.create()` with a `COLORS` constant at the bottom of each file
 - Dark UI only (`#0d0d0d` background, `#e8dcc4` text)
 - No comments explaining *what* the code does — only *why* for non-obvious decisions
@@ -76,5 +81,3 @@ When asked to commit:
 ## Known issues / TODOs
 - `app/index.tsx` initializes its own Supabase client — should use `services/supabase.ts`
 - Play Store URL in `handleShare` is commented out — add after app is published
-- No loading state / error state shown to user when band fetch fails
-- iOS not yet configured (bundle identifier exists but not tested)
