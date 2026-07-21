@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { setupDailyNotification } from '../notifications';
 
 Notifications.setNotificationHandler({
@@ -19,6 +20,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <ErrorBoundary>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ErrorBoundary>
   );
 }

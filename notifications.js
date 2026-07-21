@@ -24,10 +24,11 @@ export async function setupDailyNotification() {
 
     const today = new Date();
 
-    // Schedule next 7 days so notifications keep firing even if the user doesn't open the app daily
-    const futureDates = Array.from({ length: 7 }, (_, i) => {
+    // Include today (i = 0): if the app is opened before 8 AM, today's notification still fires.
+    // Schedule 7 more days so notifications keep firing even if the user doesn't open the app daily.
+    const futureDates = Array.from({ length: 8 }, (_, i) => {
       const d = new Date(today);
-      d.setDate(today.getDate() + i + 1);
+      d.setDate(today.getDate() + i);
       return getLocalDateString(d);
     });
 
@@ -42,19 +43,19 @@ export async function setupDailyNotification() {
 
     for (const dateStr of futureDates) {
       const [year, month, day] = dateStr.split('-').map(Number);
-      // Construct 9 AM in LOCAL time to avoid UTC offset issues
-      const fireDate = new Date(year, month - 1, day, 9, 0, 0, 0);
+      // Construct 8 AM in LOCAL time to avoid UTC offset issues
+      const fireDate = new Date(year, month - 1, day, 8, 0, 0, 0);
       if (fireDate <= today) continue;
 
       const bandName = bandByDate.get(dateStr);
-      const body = bandName
-        ? `Today's band: ${bandName}`
-        : "Today's metal band is waiting for you!";
+      const title = bandName
+        ? `Today's band is ${bandName}`
+        : "Today's band is waiting";
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🤘 Daily Metal Band',
-          body,
+          title,
+          body: 'Check it in the app!',
           sound: true,
           channelId: 'default',
         },

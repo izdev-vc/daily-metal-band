@@ -12,9 +12,11 @@ import {
 import { useFonts } from 'expo-font';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
+import { FontAwesome } from '@expo/vector-icons';
 import {
   Linking,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,12 +28,12 @@ import BottomTabBar, { TabKey } from '../components/BottomTabBar';
 import DayStrip from '../components/DayStrip';
 import FavoriteButton from '../components/FavoriteButton';
 import FavoritesList from '../components/FavoritesList';
-import ShareCard from '../components/ShareCard';
 import UndoToast from '../components/UndoToast';
 import { COLORS } from '../constants/colors';
 import { useFavorites } from '../hooks/useFavorites';
-import { track } from '../services/analytics';
+import { track, captureError } from '../services/analytics';
 import { supabase } from '../services/supabase';
+import { parseBand, type Band } from '../utils/band';
 import {
   formatDateString,
   getLocalDateString,
@@ -41,20 +43,9 @@ import {
 // Dziś + 7 dni wstecz — starsze wpisy celowo niedostępne
 const DAY_STRIP_LENGTH = 8;
 
-// ─── Typ rekordu z bazy ───────────────────────────────────────
-type Band = {
-  id: number;
-  name: string;
-  country: string;
-  year_founded: number;
-  is_active: boolean;
-  genre: string;
-  essential_album_title: string;
-  essential_album_year: number;
-  fun_fact: string;
-  wikipedia_url: string;
-  active_date: string;
-};
+const APP_DEEPLINK = 'metaldailyband://';
+const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.izdevvc.metaldailyquote';
 
 function SectionLabel({ text, accent }: { text: string; accent?: boolean }) {
   return (
@@ -122,7 +113,16 @@ export default function HomeScreen() {
           setError("No connection.\nCouldn't load\nthe band.");
           track('band_load_failed', { date: selectedDate, reason: 'network' });
         } else if (data) {
-          const loadedBand = data as Band;
+          const loadedBand = parseBand(data);
+          if (!loadedBand) {
+            setBand(null);
+            setError("Something's wrong\nwith this band's data.\nWe're on it.");
+            track('band_load_failed', { date: selectedDate, reason: 'invalid_data' });
+            captureError(new Error(`Invalid band row for ${selectedDate}`), {
+              date: selectedDate,
+            });
+            return;
+          }
           setBand(loadedBand);
           track('band_viewed', {
             band_id: loadedBand.id,
@@ -166,6 +166,29 @@ export default function HomeScreen() {
       } catch (e) {
         console.log('Cannot open URL:', e);
       }
+    }
+  };
+
+  const handleSpotify = async () => {
+    if (!band) return;
+    const url = `https://open.spotify.com/search/${encodeURIComponent(band.name)}`;
+    try {
+      await Linking.openURL(url);
+      track('spotify_opened', { band_name: band.name });
+    } catch (e) {
+      console.log('Cannot open URL:', e);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!band) return;
+    try {
+      await Share.share({
+        message: `Today's metal band: ${band.name} 🤘\n\nOpen in Daily Metal Band: ${APP_DEEPLINK}\nDon't have the app? ${PLAY_STORE_URL}`,
+      });
+      track('app_link_shared', { band_name: band.name });
+    } catch (e) {
+      console.log('Share failed:', e);
     }
   };
 
@@ -245,6 +268,35 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.heroRule} />
           <Text style={styles.heroDate}>{formatDateString(selectedDate)}</Text>
+          <View style={styles.heroActions}>
+            <TouchableOpacity
+              style={styles.heroActionBtn}
+              onPress={handleShare}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Share this band"
+            >
+              <FontAwesome name="share-alt" size={16} color={COLORS.amber} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.heroActionBtn}
+              onPress={handleWikipedia}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Read on Wikipedia"
+            >
+              <FontAwesome name="wikipedia-w" size={17} color={COLORS.amber} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.heroActionBtn}
+              onPress={handleSpotify}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Listen on Spotify"
+            >
+              <FontAwesome name="spotify" size={18} color={COLORS.amber} />
+            </TouchableOpacity>
+          </View>
           <FavoriteButton
             isFavorite={isFavorite(band.active_date)}
             onToggle={() =>
@@ -325,24 +377,7 @@ export default function HomeScreen() {
           <Text style={styles.pullquote}>{band.fun_fact}</Text>
         </View>
 
-        {/* 8. ACTIONS */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={handleWikipedia}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnPrimaryText}>↗  READ ON WIKIPEDIA</Text>
-          </TouchableOpacity>
-          <ShareCard
-            bandName={band.name}
-            genre={band.genre}
-            country={band.country}
-            foundedYear={band.year_founded}
-          />
-        </View>
-
-        {/* 9. FOOTER */}
+        {/* 8. FOOTER */}
         <Text style={styles.footnote}>— DAILY METAL BAND —</Text>
       </ScrollView>
     );
@@ -444,6 +479,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 3,
     color: COLORS.faint,
+  },
+  heroActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 16,
+  },
+  heroActionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: COLORS.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   todayPill: {
     marginTop: 14,
@@ -586,29 +636,6 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
   },
 
-  // ACTIONS
-  actions: {
-    paddingHorizontal: 24,
-    paddingVertical: 26,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
-  },
-  btn: {
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnPrimary: {
-    backgroundColor: COLORS.red,
-  },
-  btnPrimaryText: {
-    fontFamily: 'BebasNeue_400Regular',
-    fontSize: 16,
-    letterSpacing: 3,
-    color: '#fff',
-  },
   // ERROR
   errorScreen: {
     flex: 1,
